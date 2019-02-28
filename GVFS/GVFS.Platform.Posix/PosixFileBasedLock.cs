@@ -4,40 +4,41 @@ using GVFS.Common.Tracing;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using Mono.Unix.Native;
 
-namespace GVFS.Platform.Mac
+namespace GVFS.Platform.Posix
 {
-    public class MacFileBasedLock : FileBasedLock
+    public class PosixFileBasedLock : FileBasedLock
     {
         private int lockFileDescriptor;
 
-        public MacFileBasedLock(
+        public PosixFileBasedLock(
             PhysicalFileSystem fileSystem,
             ITracer tracer,
             string lockPath)
             : base(fileSystem, tracer, lockPath)
         {
-            this.lockFileDescriptor = NativeMethods.InvalidFileDescriptor;
+            this.lockFileDescriptor = -1;
         }
 
         public override bool TryAcquireLock()
         {
-            if (this.lockFileDescriptor == NativeMethods.InvalidFileDescriptor)
+            if (this.lockFileDescriptor == -1)
             {
                 this.FileSystem.CreateDirectory(Path.GetDirectoryName(this.LockPath));
 
-                this.lockFileDescriptor = NativeMethods.Open(
+                this.lockFileDescriptor = Syscall.open(
                     this.LockPath,
-                    NativeMethods.OpenCreate | NativeMethods.OpenWriteOnly,
-                    NativeMethods.FileMode644);
+                    OpenFlags.O_CREAT | OpenFlags.O_WRONLY,
+                    (FilePermissions)Convert.ToUInt16("644", 8));
 
-                if (this.lockFileDescriptor == NativeMethods.InvalidFileDescriptor)
+                if (this.lockFileDescriptor == -1)
                 {
-                    int errno = Marshal.GetLastWin32Error();
-                    EventMetadata metadata = this.CreateEventMetadata(errno);
+                    Errno errno = Stdlib.GetLastError();
+                    EventMetadata metadata = this.CreateEventMetadata((int)errno);
                     this.Tracer.RelatedWarning(
                         metadata,
-                        $"{nameof(MacFileBasedLock)}.{nameof(this.TryAcquireLock)}: Failed to open lock file");
+                        $"{nameof(PosixFileBasedLock)}.{nameof(this.TryAcquireLock)}: Failed to open lock file");
 
                     return false;
                 }
@@ -46,12 +47,12 @@ namespace GVFS.Platform.Mac
             if (NativeMethods.FLock(this.lockFileDescriptor, NativeMethods.LockEx | NativeMethods.LockNb) != 0)
             {
                 int errno = Marshal.GetLastWin32Error();
-                if (errno != NativeMethods.EIntr && errno != NativeMethods.EWouldBlock)
+                if (errno != (int)Errno.EINTR && errno != (int)Errno.EWOULDBLOCK)
                 {
                     EventMetadata metadata = this.CreateEventMetadata(errno);
                     this.Tracer.RelatedWarning(
                         metadata,
-                        $"{nameof(MacFileBasedLock)}.{nameof(this.TryAcquireLock)}: Unexpected error when locking file");
+                        $"{nameof(PosixFileBasedLock)}.{nameof(this.TryAcquireLock)}: Unexpected error when locking file");
                 }
 
                 return false;
@@ -62,9 +63,9 @@ namespace GVFS.Platform.Mac
 
         public override void Dispose()
         {
-            if (this.lockFileDescriptor != NativeMethods.InvalidFileDescriptor)
+            if (this.lockFileDescriptor != -1)
             {
-                if (NativeMethods.Close(this.lockFileDescriptor) != 0)
+                if (Syscall.close(this.lockFileDescriptor) != 0)
                 {
                     // Failures of close() are logged for diagnostic purposes only.
                     // It's possible that errors from a previous operation (e.g. write(2))
@@ -72,21 +73,21 @@ namespace GVFS.Platform.Mac
                     // it fails since it may cause a re-used file descriptor from another
                     // thread to be closed.
 
-                    int errno = Marshal.GetLastWin32Error();
-                    EventMetadata metadata = this.CreateEventMetadata(errno);
+                    Errno errno = Stdlib.GetLastError();
+                    EventMetadata metadata = this.CreateEventMetadata((int)errno);
                     this.Tracer.RelatedWarning(
                         metadata,
-                        $"{nameof(MacFileBasedLock)}.{nameof(this.Dispose)}: Error when closing lock fd");
+                        $"{nameof(PosixFileBasedLock)}.{nameof(this.Dispose)}: Error when closing lock fd");
                 }
 
-                this.lockFileDescriptor = NativeMethods.InvalidFileDescriptor;
+                this.lockFileDescriptor = -1;
             }
         }
 
         private EventMetadata CreateEventMetadata(int errno = 0)
         {
             EventMetadata metadata = new EventMetadata();
-            metadata.Add("Area", "MacFileBasedLock");
+            metadata.Add("Area", nameof(PosixFileBasedLock));
             metadata.Add(nameof(this.LockPath), this.LockPath);
             if (errno != 0)
             {
@@ -98,33 +99,10 @@ namespace GVFS.Platform.Mac
 
         private static class NativeMethods
         {
-            // #define O_WRONLY    0x0001      /* open for writing only */
-            public const int OpenWriteOnly = 0x0001;
-
-            // #define O_CREAT     0x0200      /* create if nonexistant */
-            public const int OpenCreate = 0x0200;
-
-            // #define EINTR       4       /* Interrupted system call */
-            public const int EIntr = 4;
-
-            // #define EAGAIN      35      /* Resource temporarily unavailable */
-            // #define EWOULDBLOCK EAGAIN  /* Operation would block */
-            public const int EWouldBlock = 35;
-
             public const int LockSh = 1; // #define LOCK_SH   1    /* shared lock */
             public const int LockEx = 2; // #define LOCK_EX   2    /* exclusive lock */
             public const int LockNb = 4; // #define LOCK_NB   4    /* don't block when locking */
             public const int LockUn = 8; // #define LOCK_UN   8    /* unlock */
-
-            public const int InvalidFileDescriptor = -1;
-
-            public static readonly ushort FileMode644 = Convert.ToUInt16("644", 8);
-
-            [DllImport("libc", EntryPoint = "open", SetLastError = true)]
-            public static extern int Open(string pathname, int flags, ushort mode);
-
-            [DllImport("libc", EntryPoint = "close", SetLastError = true)]
-            public static extern int Close(int fd);
 
             [DllImport("libc", EntryPoint = "flock", SetLastError = true)]
             public static extern int FLock(int fd, int operation);
