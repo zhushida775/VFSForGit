@@ -1,4 +1,5 @@
 ﻿using GVFS.Common;
+using GVFS.Platform.Posix;
 using System.IO;
 
 namespace GVFS.Platform.Mac
@@ -38,7 +39,7 @@ namespace GVFS.Platform.Mac
             enlistmentRoot = null;
 
             string finalDirectory;
-            if (!MacFileSystem.TryGetNormalizedPathImplementation(directory, out finalDirectory, out errorMessage))
+            if (!PosixFileSystem.TryGetNormalizedPathImplementation(directory, out finalDirectory, out errorMessage))
             {
                 return false;
             }

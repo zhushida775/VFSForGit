@@ -1,6 +1,6 @@
-﻿namespace GVFS.Platform.Mac
+﻿namespace GVFS.Platform.Posix
 {
-    public partial class MacFileSystem
+    public partial class PosixFileSystem
     {
         public static bool TryGetNormalizedPathImplementation(string path, out string normalizedPath, out string errorMessage)
         {

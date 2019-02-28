@@ -1,12 +1,11 @@
 using GVFS.Common;
+using GVFS.Platform.Posix;
 using System.IO;
 
 namespace GVFS.Platform.Linux
 {
     public partial class LinuxPlatform
     {
-        public const string InstallerExtension = "dmg";
-
         public static bool IsElevatedImplementation()
         {
             // TODO(Linux): Implement proper check
@@ -21,7 +20,7 @@ namespace GVFS.Platform.Linux
 
         public static string GetNamedPipeNameImplementation(string enlistmentRoot)
         {
-            // Pipes are stored as files on OSX, use a rooted pipe name to keep full control of the location of the file
+            // Pipes are stored as files on Linux, use a rooted pipe name to keep full control of the location of the file
             return Path.Combine(enlistmentRoot, GVFSConstants.DotGVFS.Root, "GVFS_NetCorePipe");
         }
 
@@ -38,7 +37,7 @@ namespace GVFS.Platform.Linux
             enlistmentRoot = null;
 
             string finalDirectory;
-            if (!LinuxFileSystem.TryGetNormalizedPathImplementation(directory, out finalDirectory, out errorMessage))
+            if (!PosixFileSystem.TryGetNormalizedPathImplementation(directory, out finalDirectory, out errorMessage))
             {
                 return false;
             }

@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace GVFS.Platform.Mac
+namespace GVFS.Platform.Posix
 {
     public static class ProcessLauncher
     {
