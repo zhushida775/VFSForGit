@@ -145,7 +145,12 @@ namespace GVFS.Common
 
         public static void ThrowLastWin32Exception(string message)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), message);
+            throw LastWin32Exception(message);
+        }
+
+        public static Win32Exception LastWin32Exception(string message)
+        {
+            return new Win32Exception(Marshal.GetLastWin32Error(), message);
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
