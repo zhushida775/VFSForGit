@@ -1,4 +1,5 @@
 using GVFS.Platform.Mac;
+using GVFS.Platform.Posix;
 
 namespace GVFS.Hooks.HooksPlatform
 {
@@ -36,7 +37,7 @@ namespace GVFS.Hooks.HooksPlatform
 
         public static bool TryGetNormalizedPath(string path, out string normalizedPath, out string errorMessage)
         {
-            return MacFileSystem.TryGetNormalizedPathImplementation(path, out normalizedPath, out errorMessage);
+            return PosixFileSystem.TryGetNormalizedPathImplementation(path, out normalizedPath, out errorMessage);
         }
     }
 }
